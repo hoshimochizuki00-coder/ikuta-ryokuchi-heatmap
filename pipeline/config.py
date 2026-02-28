@@ -42,6 +42,8 @@ GITHUB_REPO   = os.environ.get("GITHUB_REPO", "")    # "owner/repo" 形式
 GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")
 
 # ── リトライ設定 ─────────────────────────────────────────
-RETRY_ATTEMPTS   = 3
-RETRY_WAIT_MIN   = 10   # 秒
-RETRY_WAIT_MAX   = 60   # 秒
+RETRY_ATTEMPTS    = 3
+RETRY_WAIT_MIN    = 10   # 秒
+RETRY_WAIT_MAX    = 120  # 秒（exponential backoff 上限）
+RETRY_MULTIPLIER  = 10   # exponential backoff 倍率（10, 100, 120... 秒）
+INTER_MONTH_SLEEP = 5    # 月ループ間スリープ（秒）。PC API レート制限対策

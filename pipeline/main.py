@@ -21,8 +21,10 @@ import pathlib
 import sys
 from datetime import date
 
+import time
+
 import xarray as xr
-from tenacity import before_sleep_log, retry, stop_after_attempt, wait_random
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
 
 from pipeline import config
 from pipeline import export, process, query, upload
@@ -94,7 +96,7 @@ def process_one_month(
 
     @retry(
         stop=stop_after_attempt(config.RETRY_ATTEMPTS),
-        wait=wait_random(min=config.RETRY_WAIT_MIN, max=config.RETRY_WAIT_MAX),
+        wait=wait_exponential(multiplier=config.RETRY_MULTIPLIER, min=config.RETRY_WAIT_MIN, max=config.RETRY_WAIT_MAX),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
@@ -206,6 +208,9 @@ def main() -> None:
         if config.GITHUB_REPO:
             for indicator in config.INDICATORS:
                 upload.upload_summary(indicator)
+
+        # PC API レート制限対策：月ループ間に短時間スリープ
+        time.sleep(config.INTER_MONTH_SLEEP)
 
     # 欠損ファイルが未作成（欠損 0 件）の場合も空配列で作成する
     out_path = pathlib.Path(config.MISSING_LOG)

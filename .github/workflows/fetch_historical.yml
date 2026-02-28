@@ -14,9 +14,9 @@ on:
         required: true
         default: '2016-12'
       n_months:
-        description: '1ジョブあたりの処理月数（Phase 1計測後に確定）'
+        description: '1ジョブあたりの処理月数（Phase 1計測: T=75s → N=216。全期間を1回で処理可能）'
         required: false
-        default: '24'
+        default: '216'
 
 jobs:
   fetch:
