@@ -301,6 +301,16 @@ function initControls() {
     }
   });
 
+  // ベースマップ モノクロ切替（デフォルト: モノクロ ON）
+  const mapEl   = document.getElementById("map");
+  const btnBase = document.getElementById("btn-basemap");
+  mapEl.classList.add("basemap-grayscale");   // 初期状態: モノクロ
+  btnBase.addEventListener("click", () => {
+    const isGray = mapEl.classList.toggle("basemap-grayscale");
+    btnBase.classList.toggle("active", isGray);
+    btnBase.textContent = isGray ? "モノクロ" : "カラー";
+  });
+
   // 免責事項トグル
   document.querySelector(".disclaimer-link").addEventListener("click", (e) => {
     e.preventDefault();

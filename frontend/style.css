@@ -83,8 +83,8 @@ body {
   text-align: right;
 }
 
-/* ◀▶ ボタン */
-#btn-prev, #btn-next {
+/* ◀▶ ボタン・ベースマップ切替ボタン共通 */
+#btn-prev, #btn-next, #btn-basemap {
   background: none;
   border: 1px solid #555;
   color: #e0e0e0;
@@ -96,11 +96,22 @@ body {
 }
 #btn-prev:hover, #btn-next:hover { border-color: #4fc3f7; color: #4fc3f7; }
 
+/* モノクロ切替ボタン（アクティブ = モノクロ ON） */
+#btn-basemap { margin-left: 8px; white-space: nowrap; }
+#btn-basemap.active { border-color: #aaa; color: #aaa; }
+#btn-basemap:not(.active) { border-color: #4fc3f7; color: #4fc3f7; }
+
 /* ── 地図エリア ───────────────────────────────── */
 #map {
   flex: 1;
   min-height: 0;  /* flexbox 内で Leaflet が縮まないための指定 */
   position: relative;
+}
+
+/* ベースマップ モノクロ切替
+   .leaflet-tile-pane のみに適用し、ヒートマップ (.leaflet-overlay-pane) には影響しない */
+#map.basemap-grayscale .leaflet-tile-pane {
+  filter: grayscale(100%) brightness(115%);
 }
 
 /* 地図ステータス（欠損月・読み込み中） */
