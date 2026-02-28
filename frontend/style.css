@@ -1,1 +1,162 @@
-/* stub - Phase 3 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: "Noto Sans JP", "Hiragino Sans", sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+/* ── ヘッダー ─────────────────────────────────── */
+#app-header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+}
+
+/* ── コントロールバー ─────────────────────────── */
+#control-bar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 16px;
+  background: #0f3460;
+  flex-shrink: 0;
+}
+
+/* 指標セレクター */
+#indicator-selector {
+  display: flex;
+  gap: 8px;
+}
+
+#indicator-selector label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  transition: background 0.15s;
+}
+
+#indicator-selector input[type="radio"] { display: none; }
+#indicator-selector input[type="radio"]:checked + span { color: #4fc3f7; }
+#indicator-selector label:has(input:checked) {
+  background: rgba(79, 195, 247, 0.15);
+  border-color: #4fc3f7;
+}
+
+/* スライダー */
+#month-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+#month-slider { flex: 1; cursor: pointer; accent-color: #4fc3f7; }
+#month-label {
+  min-width: 64px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ◀▶ ボタン */
+#btn-prev, #btn-next {
+  background: none;
+  border: 1px solid #555;
+  color: #e0e0e0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#btn-prev:hover, #btn-next:hover { border-color: #4fc3f7; color: #4fc3f7; }
+
+/* ── 地図エリア ───────────────────────────────── */
+#map {
+  flex: 1;
+  min-height: 0;  /* flexbox 内で Leaflet が縮まないための指定 */
+  position: relative;
+}
+
+/* 地図ステータス（欠損月・読み込み中） */
+#map-status {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  z-index: 1000;
+  pointer-events: none;
+  display: none;
+}
+
+/* ── グラフエリア ─────────────────────────────── */
+#chart-area {
+  height: 220px;
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  padding: 8px 16px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+#chart-placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #888;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+#timeseries-chart {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── 免責事項 ────────────────────────────────── */
+.disclaimer-link { font-size: 11px; color: #888; text-decoration: underline; }
+
+#disclaimer {
+  padding: 6px 16px;
+  font-size: 11px;
+  color: #888;
+  background: #0f3460;
+  border-top: 1px solid #16213e;
+  flex-shrink: 0;
+  display: none;
+}
+
+#disclaimer.visible {
+  display: block;
+}

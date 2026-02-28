@@ -1,14 +1,50 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>生田緑地 環境ヒートマップ</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <p>Phase 3 で実装予定</p>
-  <script src="app.js"></script>
+  <header id="app-header">
+    <span class="title">生田緑地 環境ヒートマップ（2016–現在）</span>
+    <a href="#disclaimer" class="disclaimer-link">免責事項</a>
+  </header>
+
+  <div id="control-bar">
+    <div id="indicator-selector">
+      <label><input type="radio" name="indicator" value="ndvi" checked /><span>NDVI</span></label>
+      <label><input type="radio" name="indicator" value="evi" /><span>EVI</span></label>
+      <label><input type="radio" name="indicator" value="ndwi" /><span>NDWI</span></label>
+      <label><input type="radio" name="indicator" value="lst" /><span>LST</span></label>
+    </div>
+    <div id="month-slider-container">
+      <button id="btn-prev">&#9664;</button>
+      <input type="range" id="month-slider" min="0" max="119" value="119" />
+      <button id="btn-next">&#9654;</button>
+      <span id="month-label">----/--</span>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="chart-area">
+    <div id="chart-placeholder">地図をクリックして地点を選択してください</div>
+    <canvas id="timeseries-chart" style="display:none;"></canvas>
+  </div>
+
+  <div id="disclaimer">
+    本データは個人が作成したものであり、正確性・完全性を保証しません。
+    衛星データの性質上、雲の影響による欠損や精度のばらつきが生じる場合があります。
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist/geotiff.bundle.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+  <script src="renderer.js"></script>
   <script src="chart.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
