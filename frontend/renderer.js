@@ -154,5 +154,40 @@ const RENDERER = (() => {
     return { canvas, data, width, height };
   }
 
-  return { loadAndRender };
+  /**
+   * 指標の colormap 定義を返す（凡例用）
+   * @param {string} indicator
+   * @returns {{ min: number, max: number, palette: number[][] }}
+   */
+  function getColormap(indicator) {
+    return COLORMAPS[indicator];
+  }
+
+  /**
+   * 凡例用グラデーションバー Canvas を生成して返す。
+   * 上 → 下：max → min（上が高値）
+   * @param {string} indicator
+   * @param {number} height  バーのピクセル高さ（デフォルト 160）
+   * @returns {HTMLCanvasElement}
+   */
+  function buildLegendCanvas(indicator, height = 160) {
+    const colormap = COLORMAPS[indicator];
+    const canvas = document.createElement("canvas");
+    canvas.width  = 16;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    for (let y = 0; y < height; y++) {
+      const t = 1 - y / (height - 1);  // 1.0（上・max）→ 0.0（下・min）
+      const value = colormap.min + t * (colormap.max - colormap.min);
+      const rgb = valueToRGB(value, colormap);
+      if (rgb) {
+        ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        ctx.fillRect(0, y, 16, 1);
+      }
+    }
+    return canvas;
+  }
+
+  return { loadAndRender, getColormap, buildLegendCanvas };
 })();

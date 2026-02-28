@@ -40,6 +40,7 @@ body {
   padding: 0 16px;
   background: #0f3460;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 /* 指標セレクター */
@@ -75,7 +76,7 @@ body {
   flex: 1;
 }
 
-#month-slider { flex: 1; cursor: pointer; accent-color: #4fc3f7; }
+#month-slider { width: 100%; cursor: pointer; accent-color: #4fc3f7; }
 #month-label {
   min-width: 64px;
   font-size: 13px;
@@ -181,4 +182,120 @@ body {
 
 #disclaimer.visible {
   display: block;
+}
+
+/* ── ① カラースケール凡例 ────────────────────── */
+.map-legend {
+  background: rgba(22, 33, 62, 0.88);
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.map-legend canvas {
+  border-radius: 2px;
+  display: block;
+}
+
+.legend-label {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #ccc;
+  line-height: 1;
+}
+
+/* ── ② 指標説明ツールチップ ──────────────────── */
+.indicator-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  color: #888;
+  border: 1px solid #555;
+  border-radius: 50%;
+  cursor: help;
+  position: relative;
+  margin-left: 2px;
+  line-height: 1;
+}
+
+.indicator-info::after {
+  content: attr(aria-label);
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(15, 52, 96, 0.97);
+  color: #e0e0e0;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #4fc3f7;
+  white-space: normal;
+  pointer-events: none;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.indicator-info::before {
+  content: "";
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #4fc3f7;
+  z-index: 2001;
+  pointer-events: none;
+}
+
+.indicator-info:hover::after,
+.indicator-info:hover::before,
+.indicator-info:focus::after,
+.indicator-info:focus::before {
+  display: block;
+}
+
+/* ── ③ 欠損月インジケーター ──────────────────── */
+#slider-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
+#missing-indicator {
+  width: 100%;
+  display: block;
+}
+
+#missing-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #888;
+  align-self: flex-end;
+  line-height: 1;
+}
+
+.missing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e57373;
 }

@@ -178,6 +178,8 @@ async function loadAllSummaries() {
   slider.max        = state.totalMonths - 1;
   state.monthIndex  = state.totalMonths - 1;  // 最新月を初期表示
   slider.value      = state.monthIndex;
+
+  updateMissingIndicator(state.indicator);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -196,10 +198,12 @@ async function renderCurrentMonth() {
 
   if (result === null) {
     showStatus("欠損月：データがありません");
+    updateMissingIndicator(state.indicator);
     return;
   }
 
   hideStatus();
+  updateMissingIndicator(state.indicator);
 
   // Canvas の DataURL を L.imageOverlay で地図に重畳
   state.cogOverlay = L.imageOverlay(
@@ -264,6 +268,8 @@ function initControls() {
     radio.addEventListener("change", (e) => {
       state.indicator = e.target.value;
       cogCache.clear();           // 指標変更時はキャッシュを全クリア
+      updateLegend(state.indicator);
+      updateMissingIndicator(state.indicator);
       renderCurrentMonth();
       if (state.selectedLatLng) updateChart();
     });
@@ -275,6 +281,7 @@ function initControls() {
   slider.addEventListener("input", () => {
     state.monthIndex = parseInt(slider.value, 10);
     updateMonthLabel();
+    updateMissingIndicator(state.indicator);
     renderCurrentMonth();
     if (state.selectedLatLng) updateChart();
   });
@@ -285,6 +292,7 @@ function initControls() {
       state.monthIndex--;
       slider.value = state.monthIndex;
       updateMonthLabel();
+      updateMissingIndicator(state.indicator);
       renderCurrentMonth();
       if (state.selectedLatLng) updateChart();
     }
@@ -296,6 +304,7 @@ function initControls() {
       state.monthIndex++;
       slider.value = state.monthIndex;
       updateMonthLabel();
+      updateMissingIndicator(state.indicator);
       renderCurrentMonth();
       if (state.selectedLatLng) updateChart();
     }
@@ -319,14 +328,103 @@ function initControls() {
 }
 
 // ──────────────────────────────────────────────────────────
+// ① カラースケール凡例
+// ──────────────────────────────────────────────────────────
+let _legendControl = null;
+
+function initLegend() {
+  _legendControl = L.control({ position: "bottomright" });
+
+  _legendControl.onAdd = function () {
+    const div = L.DomUtil.create("div", "map-legend");
+    div.id = "map-legend";
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  };
+
+  _legendControl.addTo(state.map);
+  updateLegend(state.indicator);
+}
+
+function updateLegend(indicator) {
+  const container = document.getElementById("map-legend");
+  if (!container) return;
+
+  const colormap = RENDERER.getColormap(indicator);
+  const legendCanvas = RENDERER.buildLegendCanvas(indicator, 160);
+
+  const UNITS = { ndvi: "", evi: "", ndwi: "", lst: "°C" };
+  const unit = UNITS[indicator] ?? "";
+  const fmt = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1);
+
+  container.innerHTML = "";
+
+  const maxLabel = document.createElement("div");
+  maxLabel.className = "legend-label";
+  maxLabel.textContent = `${fmt(colormap.max)}${unit}`;
+  container.appendChild(maxLabel);
+
+  container.appendChild(legendCanvas);
+
+  const minLabel = document.createElement("div");
+  minLabel.className = "legend-label";
+  minLabel.textContent = `${fmt(colormap.min)}${unit}`;
+  container.appendChild(minLabel);
+}
+
+// ──────────────────────────────────────────────────────────
+// ③ 欠損月インジケーター
+// ──────────────────────────────────────────────────────────
+function updateMissingIndicator(indicator) {
+  const canvas = document.getElementById("missing-indicator");
+  if (!canvas) return;
+
+  const rows = state.summaryData[indicator];
+  if (!rows || rows.length === 0) return;
+
+  const wrapper = document.getElementById("slider-wrapper");
+  canvas.width = wrapper.clientWidth;
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const total = rows.length;
+  const THUMB_MARGIN = 8;
+  const trackWidth = canvas.width - THUMB_MARGIN * 2;
+
+  rows.forEach((row, i) => {
+    const isMissing = row.valid_ratio === null || row.valid_ratio === 0;
+    if (!isMissing) return;
+
+    const x = THUMB_MARGIN + (i / (total - 1)) * trackWidth;
+
+    ctx.beginPath();
+    if (i === state.monthIndex) {
+      ctx.fillStyle = "#ff5252";
+      ctx.arc(x, 3, 3, 0, Math.PI * 2);
+    } else {
+      ctx.fillStyle = "#e57373";
+      ctx.arc(x, 3, 2, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  });
+}
+
+// ──────────────────────────────────────────────────────────
 // エントリーポイント
 // ──────────────────────────────────────────────────────────
 async function initApp() {
   initMap();
+  initLegend();
   await loadAllSummaries();
   initControls();
   updateMonthLabel();
   renderCurrentMonth();
 }
+
+window.addEventListener("resize", () => {
+  updateMissingIndicator(state.indicator);
+});
 
 document.addEventListener("DOMContentLoaded", initApp);

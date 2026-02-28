@@ -15,14 +15,40 @@
 
   <div id="control-bar">
     <div id="indicator-selector">
-      <label><input type="radio" name="indicator" value="ndvi" checked /><span>NDVI</span></label>
-      <label><input type="radio" name="indicator" value="evi" /><span>EVI</span></label>
-      <label><input type="radio" name="indicator" value="ndwi" /><span>NDWI</span></label>
-      <label><input type="radio" name="indicator" value="lst" /><span>LST</span></label>
+      <label>
+        <input type="radio" name="indicator" value="ndvi" checked />
+        <span>NDVI</span>
+        <span class="indicator-info"
+              aria-label="植生活性度。-1〜+1の範囲で、高いほど植物が旺盛。生田緑地の緑の分布と季節変化を把握できる。">ⓘ</span>
+      </label>
+      <label>
+        <input type="radio" name="indicator" value="evi" />
+        <span>EVI</span>
+        <span class="indicator-info"
+              aria-label="強化植生指数。NDVIの密林部での飽和を補正した指標。森林中心部の変化検出に有効。">ⓘ</span>
+      </label>
+      <label>
+        <input type="radio" name="indicator" value="ndwi" />
+        <span>NDWI</span>
+        <span class="indicator-info"
+              aria-label="水分量指数。植生の乾燥ストレスや水分分布を示す。-1〜+1で、高いほど水分が豊富。">ⓘ</span>
+      </label>
+      <label>
+        <input type="radio" name="indicator" value="lst" />
+        <span>LST</span>
+        <span class="indicator-info"
+              aria-label="地表面温度（摂氏）。Landsat熱赤外バンド由来。緑地の冷却効果とヒートアイランドの比較に使用。雲の影響で欠損月が出やすい。">ⓘ</span>
+      </label>
     </div>
     <div id="month-slider-container">
       <button id="btn-prev">&#9664;</button>
-      <input type="range" id="month-slider" min="0" max="119" value="119" />
+      <div id="slider-wrapper">
+        <input type="range" id="month-slider" min="0" max="119" value="119" />
+        <canvas id="missing-indicator" height="6"></canvas>
+        <div id="missing-legend">
+          <span class="missing-dot"></span><span>欠損月</span>
+        </div>
+      </div>
       <button id="btn-next">&#9654;</button>
       <span id="month-label">----/--</span>
     </div>
