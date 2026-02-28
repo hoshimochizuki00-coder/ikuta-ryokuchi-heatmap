@@ -35,14 +35,16 @@ const CONFIG = {
 // 状態管理
 // ──────────────────────────────────────────────────────────
 const state = {
-  map:             null,   // Leaflet Map インスタンス
-  indicator:       "ndvi", // 現在選択中の指標
-  monthIndex:      0,      // スライダー値（0 = 2016-01）
-  totalMonths:     120,    // summary JSON 取得後に更新
-  selectedLatLng:  null,   // クリックされた地点（Leaflet LatLng）
-  cogOverlay:      null,   // 現在表示中の L.imageOverlay
-  clickMarker:     null,   // クリック地点マーカー
-  summaryData:     {},     // { ndvi: [...], evi: [...], ndwi: [...], lst: [...] }
+  map:             null,      // Leaflet Map インスタンス
+  indicator:       "ndvi",   // 現在選択中の指標
+  monthIndex:      0,        // スライダー値（0 = 2016-01）
+  totalMonths:     120,      // summary JSON 取得後に更新
+  selectedLatLng:  null,     // クリックされた地点（Leaflet LatLng）
+  cogOverlay:      null,     // 現在表示中の L.imageOverlay
+  clickMarker:     null,     // クリック地点マーカー
+  summaryData:     {},       // { ndvi: [...], evi: [...], ndwi: [...], lst: [...] }
+  cogMeta:         null,     // 初回 COG ロード時に格納（BBox + 幅高さ）
+  chartMode:       "summary", // "summary" | "pixel"
 };
 
 // キャッシュ: key = "{indicator}_{yyyy}_{mm}", value = Promise<CogResult|null>
@@ -190,6 +192,11 @@ async function renderCurrentMonth() {
 
   const result = await fetchAndRenderCog(state.indicator, state.monthIndex);
 
+  // 初回 COG ロード時に cogMeta を保存（全月で同一 BBox）
+  if (!state.cogMeta && result?.cogMeta) {
+    state.cogMeta = result.cogMeta;
+  }
+
   // 既存オーバーレイを削除
   if (state.cogOverlay) {
     state.map.removeLayer(state.cogOverlay);
@@ -230,6 +237,112 @@ function prefetchAdjacentMonths() {
 }
 
 // ──────────────────────────────────────────────────────────
+// ④ 地点別ピクセル値グラフ
+// ──────────────────────────────────────────────────────────
+
+/**
+ * 緯度経度から COG のピクセルインデックス（col, row）を算出する。
+ * COG の空間参照が WGS84（EPSG:4326）・原点が左上であることを前提とする。
+ * @param {number} lat
+ * @param {number} lng
+ * @param {{ west, south, east, north, width, height }} cogMeta
+ * @returns {{ col: number, row: number } | null}  範囲外は null
+ */
+function latLngToPixel(lat, lng, cogMeta) {
+  const { west, south, east, north, width, height } = cogMeta;
+  if (lng < west || lng > east || lat < south || lat > north) return null;
+  const col = Math.floor(((lng - west) / (east - west)) * width);
+  const row = Math.floor(((north - lat) / (north - south)) * height);
+  return {
+    col: Math.max(0, Math.min(col, width - 1)),
+    row: Math.max(0, Math.min(row, height - 1)),
+  };
+}
+
+/**
+ * CogResult から指定ピクセルの値を取得する。
+ * @param {{ data: Float32Array, width: number }} cogResult
+ * @param {number} col
+ * @param {number} row
+ * @returns {number | null}  NaN/Infinity は null に変換
+ */
+function getPixelValue(cogResult, col, row) {
+  const idx = row * cogResult.width + col;
+  const v = cogResult.data[idx];
+  if (!isFinite(v) || isNaN(v)) return null;
+  return v;
+}
+
+/**
+ * クリック地点の全月ピクセル値を収集し、CHART.updatePixel() に渡す。
+ * 未フェッチ月はフェッチしながら進捗を showStatus() で表示する。
+ */
+async function collectPixelTimeseries(indicator, latlng) {
+  if (!state.cogMeta) {
+    showStatus("COGメタデータ未取得。地図上のデータ読み込み後に再試行してください。");
+    return;
+  }
+
+  const pixel = latLngToPixel(latlng.lat, latlng.lng, state.cogMeta);
+  if (!pixel) {
+    showStatus("選択地点がエリア外です。");
+    return;
+  }
+
+  const values = new Array(state.totalMonths).fill(null);
+  let loaded = 0;
+
+  showStatus(`地点データ取得中… 0 / ${state.totalMonths}`);
+
+  const CONCURRENCY = 8;
+  const queue = Array.from({ length: state.totalMonths }, (_, i) => i);
+
+  async function processOne(monthIndex) {
+    try {
+      const result = await fetchAndRenderCog(indicator, monthIndex);
+      if (result) {
+        values[monthIndex] = getPixelValue(result, pixel.col, pixel.row);
+      }
+    } catch {
+      // 欠損月は null のまま
+    }
+    loaded++;
+    showStatus(`地点データ取得中… ${loaded} / ${state.totalMonths}`);
+  }
+
+  while (queue.length > 0) {
+    const batch = queue.splice(0, CONCURRENCY);
+    await Promise.all(batch.map(processOne));
+  }
+
+  hideStatus();
+
+  CHART.updatePixel(indicator, values, state.monthIndex, {
+    lat: latlng.lat.toFixed(5),
+    lng: latlng.lng.toFixed(5),
+  });
+}
+
+// ──────────────────────────────────────────────────────────
+// ⑤ COG キャッシュ無効化（値域変更時）
+// ──────────────────────────────────────────────────────────
+
+/**
+ * COG キャッシュの Canvas を無効化して現在の値域で再描画する。
+ * Float32Array（data）は保持するためネットワーク再フェッチは発生しない。
+ */
+function invalidateCogCache() {
+  const entries = [...cogCache.entries()]; // イテレーション中の変更を回避するためスナップショット
+  for (const [key, promise] of entries) {
+    const indicator = key.split("_")[0]; // "{indicator}_{yyyy}_{mm}" の先頭部分
+    cogCache.set(key, promise.then((result) => {
+      if (result === null) return null;
+      return RENDERER.rerender({ ...result, indicator });
+    }));
+  }
+}
+
+// ──────────────────────────────────────────────────────────
 // グラフ更新
 // ──────────────────────────────────────────────────────────
 function updateChart() {
@@ -256,7 +369,11 @@ function onMapClick(e) {
     fillOpacity: 1,
   }).addTo(state.map);
 
-  updateChart();
+  if (state.chartMode === "pixel") {
+    collectPixelTimeseries(state.indicator, e.latlng);
+  } else {
+    updateChart();
+  }
 }
 
 // ──────────────────────────────────────────────────────────
@@ -310,6 +427,20 @@ function initControls() {
     }
   });
 
+  // グラフモード切り替え（エリア平均 ↔ 地点別）
+  document.querySelectorAll('input[name="chart-mode"]').forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      state.chartMode = e.target.value;
+      if (state.chartMode === "summary") {
+        updateChart();
+      } else if (state.selectedLatLng) {
+        collectPixelTimeseries(state.indicator, state.selectedLatLng);
+      } else {
+        CHART.clear();
+      }
+    });
+  });
+
   // ベースマップ モノクロ切替（デフォルト: モノクロ ON）
   const mapEl   = document.getElementById("map");
   const btnBase = document.getElementById("btn-basemap");
@@ -352,7 +483,7 @@ function updateLegend(indicator) {
   if (!container) return;
 
   const colormap = RENDERER.getColormap(indicator);
-  const legendCanvas = RENDERER.buildLegendCanvas(indicator, 160);
+  const legendCanvas = RENDERER.buildLegendCanvas(indicator, 140);
 
   const UNITS = { ndvi: "", evi: "", ndwi: "", lst: "°C" };
   const unit = UNITS[indicator] ?? "";
@@ -360,17 +491,89 @@ function updateLegend(indicator) {
 
   container.innerHTML = "";
 
-  const maxLabel = document.createElement("div");
-  maxLabel.className = "legend-label";
-  maxLabel.textContent = `${fmt(colormap.max)}${unit}`;
-  container.appendChild(maxLabel);
+  // ── 最大値入力 ──
+  const maxWrap = document.createElement("div");
+  maxWrap.className = "legend-range-wrap";
+  const maxInput = document.createElement("input");
+  maxInput.type = "number";
+  maxInput.className = "legend-range-input";
+  maxInput.value = fmt(colormap.max);
+  maxInput.step = "any";
+  maxWrap.appendChild(maxInput);
+  if (unit) {
+    const maxUnit = document.createElement("span");
+    maxUnit.className = "legend-unit";
+    maxUnit.textContent = unit;
+    maxWrap.appendChild(maxUnit);
+  }
+  container.appendChild(maxWrap);
 
+  // ── グラデーションバー ──
   container.appendChild(legendCanvas);
 
-  const minLabel = document.createElement("div");
-  minLabel.className = "legend-label";
-  minLabel.textContent = `${fmt(colormap.min)}${unit}`;
-  container.appendChild(minLabel);
+  // ── 最小値入力 ──
+  const minWrap = document.createElement("div");
+  minWrap.className = "legend-range-wrap";
+  const minInput = document.createElement("input");
+  minInput.type = "number";
+  minInput.className = "legend-range-input";
+  minInput.value = fmt(colormap.min);
+  minInput.step = "any";
+  minWrap.appendChild(minInput);
+  if (unit) {
+    const minUnit = document.createElement("span");
+    minUnit.className = "legend-unit";
+    minUnit.textContent = unit;
+    minWrap.appendChild(minUnit);
+  }
+  container.appendChild(minWrap);
+
+  // ── リセットボタン ──
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "legend-reset-btn";
+  resetBtn.textContent = "リセット";
+  resetBtn.title = "デフォルト値域に戻す";
+  container.appendChild(resetBtn);
+
+  // ── エラーラベル ──
+  const errorLabel = document.createElement("div");
+  errorLabel.className = "legend-error";
+  container.appendChild(errorLabel);
+
+  // ── イベント登録 ──
+  function applyRange() {
+    const newMin = parseFloat(minInput.value);
+    const newMax = parseFloat(maxInput.value);
+    if (isNaN(newMin) || isNaN(newMax)) {
+      errorLabel.textContent = "数値を入力してください";
+      return;
+    }
+    if (newMin >= newMax) {
+      errorLabel.textContent = "min < max にしてください";
+      return;
+    }
+    errorLabel.textContent = "";
+    RENDERER.setRange(indicator, newMin, newMax);
+    invalidateCogCache();
+    updateLegend(indicator);
+    renderCurrentMonth();
+  }
+
+  minInput.addEventListener("change", applyRange);
+  maxInput.addEventListener("change", applyRange);
+  minInput.addEventListener("keydown", (e) => { if (e.key === "Enter") applyRange(); });
+  maxInput.addEventListener("keydown", (e) => { if (e.key === "Enter") applyRange(); });
+
+  resetBtn.addEventListener("click", () => {
+    RENDERER.resetRange(indicator);
+    const def = RENDERER.getDefaultRange(indicator);
+    minInput.value = fmt(def.min);
+    maxInput.value = fmt(def.max);
+    errorLabel.textContent = "";
+    invalidateCogCache();
+    updateLegend(indicator);
+    renderCurrentMonth();
+  });
 }
 
 // ──────────────────────────────────────────────────────────

@@ -6,8 +6,8 @@
 
 const RENDERER = (() => {
 
-  // 指標ごとの固定値域とカラーパレット
-  const COLORMAPS = {
+  // 指標ごとの固定値域とカラーパレット（不変デフォルト）
+  const COLORMAPS_DEFAULT = {
     ndvi: {
       min: -0.2,
       max:  0.9,
@@ -81,6 +81,14 @@ const RENDERER = (() => {
     },
   };
 
+  // ランタイム値域（ユーザー操作で変更可能）
+  const COLORMAPS = Object.fromEntries(
+    Object.entries(COLORMAPS_DEFAULT).map(([k, v]) => [
+      k,
+      { min: v.min, max: v.max, palette: v.palette },
+    ])
+  );
+
   /**
    * 値 → RGB 変換（リニア補間）
    * @param {number} value
@@ -151,7 +159,15 @@ const RENDERER = (() => {
     }
 
     ctx.putImageData(imgData, 0, 0);
-    return { canvas, data, width, height };
+    const bbox = image.getBoundingBox(); // [west, south, east, north]
+    return {
+      canvas,
+      data,
+      width,
+      height,
+      indicator,
+      cogMeta: { west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3], width, height },
+    };
   }
 
   /**
@@ -189,5 +205,56 @@ const RENDERER = (() => {
     return canvas;
   }
 
-  return { loadAndRender, getColormap, buildLegendCanvas };
+  /** 値域をランタイムで更新する（app.js から呼ばれる）*/
+  function setRange(indicator, min, max) {
+    COLORMAPS[indicator].min = min;
+    COLORMAPS[indicator].max = max;
+  }
+
+  /** デフォルト値域に戻す */
+  function resetRange(indicator) {
+    const d = COLORMAPS_DEFAULT[indicator];
+    COLORMAPS[indicator].min = d.min;
+    COLORMAPS[indicator].max = d.max;
+  }
+
+  /** デフォルト値域を取得する（UI の初期値設定用）*/
+  function getDefaultRange(indicator) {
+    const d = COLORMAPS_DEFAULT[indicator];
+    return { min: d.min, max: d.max };
+  }
+
+  /**
+   * 既存の CogResult の data を使い、現在の値域で Canvas を再描画する。
+   * ネットワークフェッチは発生しない。
+   * @param {object} cogResult - { data, width, height, cogMeta, indicator }
+   * @returns {object} 新しい canvas を持つ CogResult
+   */
+  function rerender(cogResult) {
+    const { data, width, height, cogMeta, indicator } = cogResult;
+    const colormap = COLORMAPS[indicator];
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    const imgData = ctx.createImageData(width, height);
+
+    for (let i = 0; i < width * height; i++) {
+      const rgb = valueToRGB(data[i], colormap);
+      if (rgb === null) {
+        imgData.data[i * 4 + 3] = 0;
+      } else {
+        imgData.data[i * 4 + 0] = rgb[0];
+        imgData.data[i * 4 + 1] = rgb[1];
+        imgData.data[i * 4 + 2] = rgb[2];
+        imgData.data[i * 4 + 3] = 200;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return { canvas, data, width, height, cogMeta, indicator };
+  }
+
+  return { loadAndRender, getColormap, buildLegendCanvas, setRange, resetRange, getDefaultRange, rerender };
 })();

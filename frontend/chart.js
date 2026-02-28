@@ -15,6 +15,31 @@ const CHART = (() => {
 
   let _chartInstance = null;   // Chart.js インスタンス（シングルトン）
 
+  // 現在表示月の縦線を描画するプラグイン（update / updatePixel で共有）
+  const currentLinePlugin = {
+    id: "currentLinePlugin",
+    afterDraw(chart) {
+      const label = chart.options.plugins.currentLine?.label;
+      if (!label) return;
+      const idx = chart.data.labels.indexOf(label);
+      if (idx < 0) return;
+      const metaDs = chart.getDatasetMeta(0);
+      if (!metaDs.data[idx]) return;
+      const x = metaDs.data[idx].x;
+      const { top, bottom } = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+
   /**
    * 時系列グラフを更新（または初回作成）する。
    * @param {string} indicator
@@ -68,31 +93,6 @@ const CHART = (() => {
     ];
 
     const selectedLabel = labels[selectedMonthIndex] ?? null;
-
-    // 現在表示月の縦線を描画するインラインプラグイン
-    const currentLinePlugin = {
-      id: "currentLinePlugin",
-      afterDraw(chart) {
-        const label = chart.options.plugins.currentLine?.label;
-        if (!label) return;
-        const idx = chart.data.labels.indexOf(label);
-        if (idx < 0) return;
-        const metaDs = chart.getDatasetMeta(0);
-        if (!metaDs.data[idx]) return;
-        const x = metaDs.data[idx].x;
-        const { top, bottom } = chart.chartArea;
-        const ctx = chart.ctx;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(x, top);
-        ctx.lineTo(x, bottom);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        ctx.stroke();
-        ctx.restore();
-      },
-    };
 
     if (_chartInstance) {
       // データ更新（チャート再生成より高速）
@@ -152,6 +152,89 @@ const CHART = (() => {
   }
 
   /**
+   * 地点別ピクセル値の時系列グラフを描画する。
+   * @param {string} indicator
+   * @param {(number|null)[]} pixelValues  全月のピクセル値配列（null は欠損）
+   * @param {number} selectedMonthIndex
+   * @param {{ lat: string, lng: string }} pointInfo  ラベル表示用
+   */
+  function updatePixel(indicator, pixelValues, selectedMonthIndex, pointInfo) {
+    const meta = META[indicator];
+    const canvas = document.getElementById("timeseries-chart");
+    const placeholder = document.getElementById("chart-placeholder");
+
+    canvas.style.display = "block";
+    placeholder.style.display = "none";
+    document.getElementById("chart-note").style.display = "none"; // 地点別モードでは非表示
+
+    const START_YEAR  = 2016;
+    const START_MONTH = 1;
+    const labels = pixelValues.map((_, i) => {
+      const total = START_YEAR * 12 + (START_MONTH - 1) + i;
+      const y = Math.floor(total / 12);
+      const m = (total % 12) + 1;
+      return `${y}-${String(m).padStart(2, "0")}`;
+    });
+
+    const datasets = [
+      {
+        label: `${meta.label}（${pointInfo.lat}, ${pointInfo.lng}）`,
+        data: pixelValues,
+        borderColor: "#f59e0b",
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        pointRadius: 2,
+        spanGaps: false,
+      },
+    ];
+
+    const selectedLabel = labels[selectedMonthIndex] ?? null;
+
+    if (_chartInstance) {
+      _chartInstance.data.labels   = labels;
+      _chartInstance.data.datasets = datasets;
+      _chartInstance.options.plugins.currentLine = { label: selectedLabel };
+      _chartInstance.update("none");
+    } else {
+      _chartInstance = new Chart(canvas, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive:          true,
+          maintainAspectRatio: false,
+          animation:           false,
+          color:               "#ccc",
+          plugins: {
+            legend: {
+              position: "top",
+              labels:   { boxWidth: 12, font: { size: 11 }, color: "#ccc" },
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) =>
+                  `${ctx.dataset.label}: ${ctx.raw !== null ? ctx.raw.toFixed(4) + meta.unit : "欠損"}`,
+              },
+            },
+            currentLine: { label: selectedLabel },
+          },
+          scales: {
+            x: {
+              ticks: { maxTicksLimit: 24, font: { size: 10 }, color: "#aaa" },
+              grid:  { color: "rgba(255,255,255,0.05)" },
+            },
+            y: {
+              title: { display: true, text: meta.unit || meta.label, font: { size: 11 }, color: "#aaa" },
+              ticks: { color: "#aaa", font: { size: 10 } },
+              grid:  { color: "rgba(255,255,255,0.05)" },
+            },
+          },
+        },
+        plugins: [currentLinePlugin],
+      });
+    }
+  }
+
+  /**
    * グラフを破棄してプレースホルダーを表示する。
    */
   function clear() {
@@ -164,5 +247,5 @@ const CHART = (() => {
     document.getElementById("chart-note").style.display = "none";
   }
 
-  return { update, clear };
+  return { update, updatePixel, clear };
 })();
