@@ -168,6 +168,27 @@ body {
 }
 
 /* ── 免責事項 ────────────────────────────────── */
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-link {
+  font-size: 11px;
+  color: #4fc3f7;
+  text-decoration: none;
+  border: 1px solid #4fc3f7;
+  border-radius: 3px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.header-link:hover {
+  background: rgba(79, 195, 247, 0.15);
+}
+
 .disclaimer-link { font-size: 11px; color: #888; text-decoration: underline; }
 
 #disclaimer {
