@@ -289,13 +289,13 @@ function getPixelValue(cogResult, col, row) {
  * 未フェッチ月はフェッチしながら進捗を showStatus() で表示する。
  */
 async function collectPixelTimeseries(indicator, latlng) {
-  if (!state.cogMeta) {
-    showStatus("COGメタデータ未取得。地図上のデータ読み込み後に再試行してください。");
-    return;
-  }
-
-  const pixel = latLngToPixel(latlng.lat, latlng.lng, state.cogMeta);
-  if (!pixel) {
+  // CONFIG.BBOX で境界チェック（state.cogMeta に依存しない）
+  const west  = CONFIG.BBOX[0][1];
+  const south = CONFIG.BBOX[0][0];
+  const east  = CONFIG.BBOX[1][1];
+  const north = CONFIG.BBOX[1][0];
+  if (latlng.lng < west || latlng.lng > east ||
+      latlng.lat < south || latlng.lat > north) {
     showStatus("選択地点がエリア外です。");
     return;
   }
@@ -312,7 +312,17 @@ async function collectPixelTimeseries(indicator, latlng) {
     try {
       const result = await fetchAndRenderCog(indicator, monthIndex);
       if (result) {
-        values[monthIndex] = getPixelValue(result, pixel.col, pixel.row);
+        // 指標ごとに COG の解像度（ピクセル数）が異なるため、
+        // state.cogMeta（NDVI由来）を流用せず各月の実寸法で計算する
+        // （NDVI/EVI/NDWI: Sentinel-2 10m ≒ 390×320px、
+        //   LST: Landsat 30m ≒ 130×107px）
+        const px = latLngToPixel(latlng.lat, latlng.lng, {
+          west, south, east, north,
+          width: result.width, height: result.height,
+        });
+        if (px) {
+          values[monthIndex] = getPixelValue(result, px.col, px.row);
+        }
       }
     } catch {
       // 欠損月は null のまま
