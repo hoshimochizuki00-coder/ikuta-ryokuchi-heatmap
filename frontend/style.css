@@ -230,7 +230,7 @@ body {
   content: attr(aria-label);
   display: none;
   position: absolute;
-  bottom: calc(100% + 6px);
+  top: calc(100% + 6px);   /* 下向き：アイコン下端から6px */
   left: 50%;
   transform: translateX(-50%);
   min-width: 200px;
@@ -252,11 +252,11 @@ body {
   content: "";
   display: none;
   position: absolute;
-  bottom: calc(100% + 1px);
+  top: calc(100% + 1px);   /* 下向き：アイコン下端から1px */
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: #4fc3f7;
+  border-bottom-color: #4fc3f7;  /* 上向き三角形（下方ツールチップの矢印） */
   z-index: 2001;
   pointer-events: none;
 }
@@ -266,6 +266,16 @@ body {
 .indicator-info:focus::after,
 .indicator-info:focus::before {
   display: block;
+}
+
+/* NDVI（左端）はツールチップを左揃えにして画面外にはみ出さないようにする */
+#indicator-selector label:first-child .indicator-info::after {
+  left: 0;
+  transform: none;
+}
+#indicator-selector label:first-child .indicator-info::before {
+  left: 7px;   /* アイコン中央（14px / 2）に矢印を合わせる */
+  transform: none;
 }
 
 /* ── ③ 欠損月インジケーター ──────────────────── */

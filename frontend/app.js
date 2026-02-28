@@ -170,11 +170,15 @@ async function loadAllSummaries() {
     }
   }));
 
-  // totalMonths を NDVI summary の行数から確定（欠損が多い場合は他指標で補完）
-  const maxLen = Math.max(
-    ...indicators.map(ind => state.summaryData[ind].length)
-  );
-  state.totalMonths = maxLen > 0 ? maxLen : 120;
+  // totalMonths を現在日付から算出（前月まで）
+  // summary JSON の行数に依存しないため、データ未配信月もスライダーに表示される
+  {
+    const now = new Date();
+    let endYear  = now.getFullYear();
+    let endMonth = now.getMonth(); // 0-based: 0=Jan → このままで「前月の月番号（1-based）」
+    if (endMonth === 0) { endYear--; endMonth = 12; }
+    state.totalMonths = (endYear - CONFIG.START_YEAR) * 12 + (endMonth - CONFIG.START_MONTH) + 1;
+  }
 
   const slider = document.getElementById("month-slider");
   slider.max        = state.totalMonths - 1;
@@ -192,9 +196,16 @@ async function renderCurrentMonth() {
 
   const result = await fetchAndRenderCog(state.indicator, state.monthIndex);
 
-  // 初回 COG ロード時に cogMeta を保存（全月で同一 BBox）
-  if (!state.cogMeta && result?.cogMeta) {
-    state.cogMeta = result.cogMeta;
+  // 初回 COG ロード時に cogMeta を WGS84 固定で構築（image.getBoundingBox は UTM になる場合があるため CONFIG.BBOX を使用）
+  if (!state.cogMeta && result) {
+    state.cogMeta = {
+      west:   CONFIG.BBOX[0][1],  // [[south, west], [north, east]] → west
+      south:  CONFIG.BBOX[0][0],  // south
+      east:   CONFIG.BBOX[1][1],  // east
+      north:  CONFIG.BBOX[1][0],  // north
+      width:  result.width,
+      height: result.height,
+    };
   }
 
   // 既存オーバーレイを削除
@@ -592,18 +603,22 @@ function updateMissingIndicator(indicator) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const total = rows.length;
   const THUMB_MARGIN = 8;
   const trackWidth = canvas.width - THUMB_MARGIN * 2;
+  const totalSlots = state.totalMonths;  // totalMonths はスライダー全体の月数
 
-  rows.forEach((row, i) => {
+  rows.forEach((row) => {
     const isMissing = row.valid_ratio === null || row.valid_ratio === 0;
     if (!isMissing) return;
 
-    const x = THUMB_MARGIN + (i / (total - 1)) * trackWidth;
+    // year/month から月インデックスを算出（スライダーと同じ基準）
+    const rowIndex = (row.year - CONFIG.START_YEAR) * 12 + (row.month - CONFIG.START_MONTH);
+    if (rowIndex < 0 || rowIndex >= totalSlots) return;
+
+    const x = THUMB_MARGIN + (rowIndex / (totalSlots - 1)) * trackWidth;
 
     ctx.beginPath();
-    if (i === state.monthIndex) {
+    if (rowIndex === state.monthIndex) {
       ctx.fillStyle = "#ff5252";
       ctx.arc(x, 3, 3, 0, Math.PI * 2);
     } else {
