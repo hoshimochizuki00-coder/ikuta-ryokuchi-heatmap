@@ -10,14 +10,10 @@
 // 定数
 // ──────────────────────────────────────────────────────────
 const CONFIG = {
-  // GitHub Releases URL テンプレート（デプロイ時に OWNER を書き換える）
-  COG_URL_TEMPLATE:
-    "https://github.com/{owner}/{repo}/releases/download/data-{indicator}-{yyyy}/{indicator}_{yyyy}_{mm}.tif",
-  SUMMARY_URL_TEMPLATE:
-    "https://github.com/{owner}/{repo}/releases/download/data-summary/summary_{indicator}.json",
-
-  OWNER: "hoshimochizuki00-coder",   // ← デプロイ時に書き換え
-  REPO:  "ikuta-ryokuchi-heatmap",
+  // データファイル URL（GitHub Pages 同一オリジンから配信）
+  // deploy_pages.yml がリリースアセットを ./data/ 以下に展開する
+  COG_URL_TEMPLATE:     "./data/{indicator}/{indicator}_{yyyy}_{mm}.tif",
+  SUMMARY_URL_TEMPLATE: "./data/summary_{indicator}.json",
 
   // エリア定義（Leaflet 形式: [[south, west], [north, east]]）
   BBOX:         [[35.594, 139.543], [35.626, 139.582]],
@@ -69,19 +65,16 @@ function monthIndexToYYYYMM(index) {
 
 function buildCogUrl(indicator, index) {
   const { yyyy, mm } = monthIndexToYYYYMM(index);
+  // /g フラグで全出現箇所を置換（テンプレート内に {indicator}/{yyyy} が複数回ある）
   return CONFIG.COG_URL_TEMPLATE
-    .replace("{owner}", CONFIG.OWNER)
-    .replace("{repo}",  CONFIG.REPO)
-    .replace("{indicator}", indicator)
-    .replace("{yyyy}", yyyy)
-    .replace("{mm}",   mm);
+    .replace(/\{indicator\}/g, indicator)
+    .replace(/\{yyyy\}/g,      yyyy)
+    .replace(/\{mm\}/g,        mm);
 }
 
 function buildSummaryUrl(indicator) {
   return CONFIG.SUMMARY_URL_TEMPLATE
-    .replace("{owner}", CONFIG.OWNER)
-    .replace("{repo}",  CONFIG.REPO)
-    .replace("{indicator}", indicator);
+    .replace(/\{indicator\}/g, indicator);
 }
 
 // ──────────────────────────────────────────────────────────

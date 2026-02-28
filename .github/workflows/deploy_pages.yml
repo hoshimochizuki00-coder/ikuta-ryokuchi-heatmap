@@ -1,6 +1,11 @@
 # .github/workflows/deploy_pages.yml
-# frontend/ ディレクトリを GitHub Pages にデプロイする。
-# main ブランチへの push（frontend/ 配下の変更時）、または手動実行で動作する。
+# frontend/ + GitHub Releases のデータファイルを GitHub Pages にデプロイする。
+# 同一オリジンでデータを配信することで CORS 問題を回避する。
+#
+# トリガー:
+#   - main への push（frontend/ 変更時）
+#   - fetch_historical / fetch_monthly 完了後（データ更新時に自動再デプロイ）
+#   - 手動実行
 
 name: Deploy GitHub Pages
 
@@ -10,6 +15,12 @@ on:
       - main
     paths:
       - 'frontend/**'
+  workflow_run:
+    workflows:
+      - "Fetch Historical Data"
+      - "Fetch Monthly Data"
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -33,13 +44,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download data from GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p frontend/data/ndvi frontend/data/evi frontend/data/ndwi frontend/data/lst
+
+          # summary JSON/CSV をダウンロード
+          gh release download "data-summary" \
+            --dir "frontend/data" \
+            --repo "${{ github.repository }}" \
+            --clobber 2>/dev/null \
+            || echo "[deploy] data-summary not found, skipping"
+
+          # COG ファイルを指標・年ごとにダウンロード
+          current_year=$(date +%Y)
+          for indicator in ndvi evi ndwi lst; do
+            for year in $(seq 2016 "$current_year"); do
+              tag="data-${indicator}-${year}"
+              gh release download "$tag" \
+                --dir "frontend/data/${indicator}" \
+                --repo "${{ github.repository }}" \
+                --clobber 2>/dev/null \
+                || true  # リリースが存在しない年はスキップ
+            done
+          done
+
+          echo "[deploy] Data files downloaded:"
+          find frontend/data -type f | wc -l
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'frontend'   # frontend/ ディレクトリ全体をアップロード
+          path: 'frontend'   # frontend/data/ を含む全ファイルをデプロイ
 
       - name: Deploy to GitHub Pages
         id: deployment
