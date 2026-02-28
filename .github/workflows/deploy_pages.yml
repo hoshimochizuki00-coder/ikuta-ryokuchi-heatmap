@@ -48,9 +48,9 @@ jobs:
         run: |
           mkdir -p frontend/assets/js
 
-          # geotiff.js 2.1.3 バンドル（CDN に依存しないよう CI でダウンロード）
-          curl -fsSL "https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist/geotiff.bundle.js" \
-            -o "frontend/assets/js/geotiff.bundle.js"
+          # geotiff.js 2.1.3 ブラウザ向けバンドル（dist-browser/ 以下に格納）
+          curl -fsSL "https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js" \
+            -o "frontend/assets/js/geotiff.js"
 
           # Chart.js 4.4.4 UMD ビルド
           curl -fsSL "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" \
@@ -58,6 +58,10 @@ jobs:
 
           echo "[deploy] Libraries downloaded:"
           ls -lh frontend/assets/js/
+
+          # geotiff.js がグローバル GeoTIFF を公開しているか確認（先頭10行を表示）
+          echo "--- geotiff.js head ---"
+          head -3 frontend/assets/js/geotiff.js
 
       - name: Download data from GitHub Releases
         env:
