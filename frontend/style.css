@@ -155,6 +155,17 @@ body {
   height: 100% !important;
 }
 
+/* グラフ注釈（グラフ表示時のみ visible） */
+#chart-note {
+  display: none;
+  position: absolute;
+  bottom: 4px;
+  right: 16px;
+  font-size: 10px;
+  color: #888;
+  pointer-events: none;
+}
+
 /* ── 免責事項 ────────────────────────────────── */
 .disclaimer-link { font-size: 11px; color: #888; text-decoration: underline; }
 

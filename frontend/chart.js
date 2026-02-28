@@ -28,6 +28,7 @@ const CHART = (() => {
 
     canvas.style.display      = "block";
     placeholder.style.display = "none";
+    document.getElementById("chart-note").style.display = "block";
 
     const labels = summaryRows.map(r => `${r.year}-${String(r.month).padStart(2, "0")}`);
     const means  = summaryRows.map(r => (r.mean  !== undefined && r.mean  !== null) ? r.mean  : null);
@@ -160,6 +161,7 @@ const CHART = (() => {
     }
     document.getElementById("timeseries-chart").style.display = "none";
     document.getElementById("chart-placeholder").style.display = "block";
+    document.getElementById("chart-note").style.display = "none";
   }
 
   return { update, clear };
