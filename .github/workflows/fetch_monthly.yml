@@ -1,0 +1,64 @@
+# .github/workflows/fetch_monthly.yml
+
+name: Fetch Monthly Data
+
+on:
+  schedule:
+    - cron: '0 2 5 * *'          # 毎月5日 02:00 UTC（JST 11:00）
+                                  # 1日ではなく5日にする理由：前月末の
+                                  # Sentinel-2/Landsat処理・公開に数日かかるため
+  workflow_dispatch:
+    inputs:
+      target_month:
+        description: '処理対象月 (YYYY-MM)。省略時は前月'
+        required: false
+        default: ''
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60           # 月次1ヶ月分なので1時間で十分
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Resolve target month
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.target_month }}" ]; then
+            echo "month=${{ github.event.inputs.target_month }}" >> $GITHUB_OUTPUT
+          else
+            # 前月をYYYY-MM形式で算出
+            echo "month=$(date -d 'last month' '+%Y-%m')" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          python pipeline/main.py \
+            --mode monthly \
+            --start ${{ steps.resolve.outputs.month }} \
+            --end ${{ steps.resolve.outputs.month }}
+
+      - name: Upload missing.json as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-monthly-${{ steps.resolve.outputs.month }}
+          path: output/missing.json
+          if-no-files-found: ignore
+          retention-days: 90

@@ -1,0 +1,61 @@
+# .github/workflows/fetch_historical.yml
+
+name: Fetch Historical Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: '処理開始月 (YYYY-MM)'
+        required: true
+        default: '2016-01'
+      end:
+        description: '処理終了月 (YYYY-MM)'
+        required: true
+        default: '2016-12'
+      n_months:
+        description: '1ジョブあたりの処理月数（Phase 1計測後に確定）'
+        required: false
+        default: '24'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340          # 5時間40分。6時間制限に20分余裕
+    permissions:
+      contents: write             # gh release create/upload に必要
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install gh CLI       # ubuntu-latestには標準搭載だが明示的に確認
+        run: gh --version
+
+      - name: Run pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          python pipeline/main.py \
+            --mode historical \
+            --start ${{ github.event.inputs.start }} \
+            --end ${{ github.event.inputs.end }}
+
+      - name: Upload missing.json as artifact
+        if: always()              # 処理失敗時も欠損ログを保持する
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-${{ github.event.inputs.start }}-${{ github.event.inputs.end }}
+          path: output/missing.json
+          if-no-files-found: ignore
+          retention-days: 90
