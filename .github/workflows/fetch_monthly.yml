@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60           # 月次1ヶ月分なので1時間で十分
     permissions:
-      contents: write
+      contents: write            # release upload + run_log コミットに必要
 
     steps:
       - name: Checkout
@@ -62,3 +62,28 @@ jobs:
           path: output/missing.json
           if-no-files-found: ignore
           retention-days: 90
+
+      - name: Record run log
+        # リポジトリへの push 実績を残すことで、60日非アクティブによる
+        # スケジュール実行の自動無効化を防ぐ（release アップロードは
+        # git push を伴わないため、これが無いと毎回無効化されてしまう）
+        if: always()
+        run: |
+          mkdir -p run_log
+          if [ -f output/missing.json ]; then
+            missing_count=$(python -c "import json; print(len(json.load(open('output/missing.json'))))")
+          else
+            missing_count="N/A"
+          fi
+          echo "- $(date -u '+%Y-%m-%d %H:%M UTC') | target=${{ steps.resolve.outputs.month }} | status=${{ job.status }} | missing=${missing_count}" >> run_log/monthly.md
+
+      - name: Commit run log
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add run_log/monthly.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: monthly run log (${{ steps.resolve.outputs.month }})"
+            git push
+          fi
